@@ -240,4 +240,6 @@ Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninst
 Set-Location $env:TEMP
 Remove-Item -LiteralPath $programDir -Recurse -Force
 ";
-        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1"), s
+        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1"), script);
+    }
+}
