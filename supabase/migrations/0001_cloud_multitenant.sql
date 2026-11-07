@@ -168,4 +168,42 @@ create policy businesses_read_members on public.businesses for select to authent
   using (private.is_business_member(id));
 create policy businesses_update_admin on public.businesses for update to authenticated
   using (private.is_business_admin(id)) with check (private.is_business_admin(id));
-create policy memb
+create policy members_read_self_or_admin on public.business_members for select to authenticated
+  using (user_id = (select auth.uid()) or private.is_business_admin(business_id));
+
+create policy products_read_members on public.products for select to authenticated
+  using (private.is_business_member(business_id));
+create policy products_insert_admin on public.products for insert to authenticated
+  with check (private.is_business_admin(business_id));
+create policy products_update_admin on public.products for update to authenticated
+  using (private.is_business_admin(business_id)) with check (private.is_business_admin(business_id));
+create policy products_delete_admin on public.products for delete to authenticated
+  using (private.is_business_admin(business_id));
+
+create policy sales_read_members on public.sales for select to authenticated
+  using (private.is_business_member(business_id));
+create policy sales_insert_member on public.sales for insert to authenticated
+  with check (private.is_business_member(business_id) and seller_user_id = (select auth.uid()));
+create policy sale_items_read_members on public.sale_items for select to authenticated
+  using (private.is_business_member(business_id));
+create policy sale_items_insert_own_sale on public.sale_items for insert to authenticated
+  with check (
+    private.is_business_member(business_id)
+    and exists (
+      select 1 from public.sales s
+      where s.business_id = sale_items.business_id and s.id = sale_items.sale_id
+        and (s.seller_user_id = (select auth.uid()) or private.is_business_admin(s.business_id))
+    )
+  );
+
+create policy settings_read_members on public.business_settings for select to authenticated
+  using (private.is_business_member(business_id));
+create policy settings_insert_admin on public.business_settings for insert to authenticated
+  with check (private.is_business_admin(business_id));
+create policy settings_update_admin on public.business_settings for update to authenticated
+  using (private.is_business_admin(business_id)) with check (private.is_business_admin(business_id));
+
+create policy monthly_closes_read_members on public.monthly_closes for select to authenticated
+  using (private.is_business_member(business_id));
+create policy monthly_closes_insert_admin on public.monthly_closes for insert to authenticated
+  with check (private.is_business_admin(business_id) and closed_by = (select auth.uid()));

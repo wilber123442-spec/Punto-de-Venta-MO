@@ -166,4 +166,80 @@ internal static class Installer
             }
 
             if (Directory.Exists(installDirectory)) Directory.Delete(installDirectory, true);
-            Direct
+            Directory.CreateDirectory(installDirectory);
+            ZipFile.ExtractToDirectory(archivePath, installDirectory);
+            Directory.CreateDirectory(localDataDirectory);
+            if (!String.IsNullOrEmpty(initialCurrency))
+                File.WriteAllText(Path.Combine(localDataDirectory, "initial-currency.txt"), initialCurrency);
+            WriteUninstaller(installDirectory);
+            CreateShortcuts(installDirectory);
+            RegisterApplication(installDirectory, localDataDirectory);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDirectory, true); } catch { }
+        }
+    }
+
+    private static void CreateShortcuts(string installDirectory)
+    {
+        string appExe = Path.Combine(installDirectory, ProductName + ".exe");
+        string icon = Path.Combine(installDirectory, "resources", "punto-venta-mo.ico");
+        string startMenu = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+            "Programs",
+            ProductName);
+        Directory.CreateDirectory(startMenu);
+        CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ProductName + ".lnk"), appExe, installDirectory, icon);
+        CreateShortcut(Path.Combine(startMenu, ProductName + ".lnk"), appExe, installDirectory, icon);
+    }
+
+    private static void CreateShortcut(string shortcutPath, string target, string workingDirectory, string icon)
+    {
+        Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+        if (shellType == null) throw new InvalidOperationException("Windows no pudo crear el acceso directo.");
+        object shell = Activator.CreateInstance(shellType);
+        object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath });
+        Type shortcutType = shortcut.GetType();
+        shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { target });
+        shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { workingDirectory });
+        shortcutType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { icon });
+        shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { ProductName });
+        shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
+        System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut);
+        System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+    }
+
+    private static void RegisterApplication(string installDirectory, string localDataDirectory)
+    {
+        string appExe = Path.Combine(installDirectory, ProductName + ".exe");
+        string uninstaller = Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1");
+        string uninstallCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + uninstaller + "\"";
+        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(UninstallKey))
+        {
+            key.SetValue("DisplayName", ProductName);
+            key.SetValue("DisplayVersion", "1.0.0");
+            key.SetValue("Publisher", ProductName);
+            key.SetValue("InstallLocation", installDirectory);
+            key.SetValue("DisplayIcon", appExe + ",0");
+            key.SetValue("UninstallString", uninstallCommand);
+            key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+            key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+            key.SetValue("EstimatedSize", 360000, RegistryValueKind.DWord);
+        }
+    }
+
+    private static void WriteUninstaller(string installDirectory)
+    {
+        string script = @"$ErrorActionPreference = 'SilentlyContinue'
+$programDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Punto de Venta MO.lnk') -Force
+Remove-Item -LiteralPath (Join-Path (Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\Punto de Venta MO') 'Punto de Venta MO.lnk') -Force
+Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\Punto de Venta MO') -Recurse -Force
+Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PuntoDeVentaMO' -Recurse -Force
+Set-Location $env:TEMP
+Remove-Item -LiteralPath $programDir -Recurse -Force
+";
+        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1"), script);
+    }
+}
