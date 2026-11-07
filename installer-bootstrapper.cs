@@ -56,7 +56,7 @@ internal static class Installer
             currencyPrompt.Location = new System.Drawing.Point(20, 88);
             currencyChoices.DropDownStyle = ComboBoxStyle.DropDownList;
             currencyChoices.Items.AddRange(new object[] {
-                "Nicaragua · Córdobas (NIO)", "Estados Unidos · Dólares (USD)",
+                "Nicaragua · Córdobas (NIO)", "Estados Unidos · Dólares estadounidenses (USD)",
                 "México · Pesos (MXN)", "Costa Rica · Colones (CRC)",
                 "Honduras · Lempiras (HNL)", "Guatemala · Quetzales (GTQ)",
                 "Panamá · Balboas (PAB)", "Colombia · Pesos (COP)",
@@ -240,6 +240,4 @@ Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninst
 Set-Location $env:TEMP
 Remove-Item -LiteralPath $programDir -Recurse -Force
 ";
-        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1"), script);
-    }
-}
+        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1"), s
