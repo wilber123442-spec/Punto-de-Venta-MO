@@ -1,0 +1,59 @@
+name: Publicar actualización de Windows
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar-actualizacion-windows
+  cancel-in-progress: false
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Calcular versión siguiente
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $base = (Get-Content package.json | ConvertFrom-Json).version
+          $version = [version]$base
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $releases = @(Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/wilber123442-spec/punto-de-venta-mo/releases?per_page=1')
+          if ($releases.Count -gt 0) {
+            $latestVersion = [version]($releases[0].tag_name.TrimStart('v'))
+            if ($latestVersion -ge $version) { $version = [version]::new($latestVersion.Major, $latestVersion.Minor, ($latestVersion.Build + 1)) }
+          }
+          $next = $version.ToString(3)
+          npm version $next --no-git-tag-version
+          "APP_VERSION=$next" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+      - name: Crear el instalador de Windows
+        run: pnpm run dist:win
+      - name: Publicar una versión para el actualizador
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: Punto de Venta MO ${{ env.APP_VERSION }}
+          generate_release_notes: true
+          files: outputs/instalador-windows/Punto-de-Venta-MO-Setup-${{ env.APP_VERSION }}.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

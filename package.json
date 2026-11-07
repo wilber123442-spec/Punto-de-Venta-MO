@@ -1,0 +1,19 @@
+{
+  "name": "punto-de-venta-mo",
+  "version": "1.0.4",
+  "description": "Sistema de ventas Punto de Venta MO",
+  "main": "main.cjs",
+  "author": "Punto de Venta MO",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --config electron-builder.config.cjs --publish never && node build-installer.cjs"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.12"
+  }
+}
