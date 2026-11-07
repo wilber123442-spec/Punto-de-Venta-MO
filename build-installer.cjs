@@ -71,6 +71,6 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error(error.stack || error.message);
+  console.error(error.stderr || error.stdout || error.stack || error.message);
   process.exitCode = 1;
 });
