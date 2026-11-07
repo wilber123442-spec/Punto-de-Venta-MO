@@ -51,6 +51,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Crear el instalador de Windows
         run: pnpm run dist:win
+      - name: Preparar el instalador para la publicación
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path 'outputs/instalador-windows' -Force | Out-Null
+          Copy-Item -Path "../../outputs/instalador-windows/Punto-de-Venta-MO-Setup-${{ env.APP_VERSION }}.exe" -Destination 'outputs/instalador-windows/' -Force
       - name: Publicar una versión para el actualizador
         uses: softprops/action-gh-release@v2
         with:
