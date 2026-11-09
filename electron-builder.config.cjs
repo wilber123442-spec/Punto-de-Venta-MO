@@ -13,7 +13,7 @@ module.exports = {
     await execFileAsync(rcedit, [exe, '--set-icon', path.join(__dirname, 'assets', 'mi-caja.ico')]);
   },
   directories: { output: '../../outputs/instalador-windows' },
-  files: ['main.cjs', 'preload.cjs', 'ventas-mi-negocio.html', 'package.json', 'assets/mi-caja.png'],
+  files: ['main.cjs', 'preload.cjs', 'ventas-mi-negocio.html', 'cloud-client.js', 'cloud-setup.js', 'cloud-sync.js', 'package.json', 'assets/mi-caja.png'],
   win: {
     icon: path.join(__dirname, 'assets', 'mi-caja.ico'),
     signAndEditExecutable: false,
@@ -21,5 +21,6 @@ module.exports = {
     artifactName: 'Punto-de-Venta-MO-Setup-${version}.${ext}'
   },
 };
+
 
 

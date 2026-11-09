@@ -24,8 +24,8 @@ El repositorio público `wilber123442-spec/punto-de-venta-mo` debe existir y con
 
 La ubicación de datos del usuario está fuera de la carpeta de instalación y el desinstalador no la elimina.
 
-## Datos en la nube y uso sin internet
+## Datos locales y nube opcional
 
-El programa actual todavía guarda la información de forma local en la computadora. El esquema inicial de Supabase en `supabase/migrations` es una preparación: **no significa que la aplicación ya esté conectada ni que haya subido datos**. La pantalla de acceso actual también guarda las contraseñas localmente en texto legible; no se debe distribuir esta versión para manejar datos reales de clientes.
+Mi Caja C$ guarda primero cada operación en la computadora para poder vender sin internet. Si el negocio vincula una cuenta en la nube, sincroniza productos, existencias y ventas entre equipos. El catálogo se comparte entre los miembros del negocio; cada cajero ve solo sus ventas y el administrador puede revisar todas. Los negocios que no activen la nube usan el modo local.
 
-Antes de comercializar, completa la integración de autenticación en la nube, separación por negocio, sincronización local/nube y creación segura de usuarios. Consulta `CLOUD_SETUP.md`. Las contraseñas deben quedar bajo Supabase Auth, que conserva hashes; nunca se debe guardar la contraseña en tablas propias ni incluir una clave `service_role` en la aplicación.
+Las cuentas de nube se administran con Supabase Auth. Para vender sin conexión y sincronizar después, cada empleado usa el mismo nombre de usuario en su cuenta local y de nube. Las contraseñas locales se protegen con PBKDF2; las contraseñas de nube solo las gestiona Supabase Auth. Consulta `CLOUD_SETUP.md` para los pasos de conexión.

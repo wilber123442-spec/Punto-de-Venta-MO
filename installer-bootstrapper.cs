@@ -341,3 +341,4 @@ Start-Process -FilePath $env:ComSpec -WindowStyle Hidden -ArgumentList @('/c', '
         File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1"), script);
     }
 }
+

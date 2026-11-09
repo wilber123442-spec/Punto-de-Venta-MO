@@ -6,3 +6,4 @@ contextBridge.exposeInMainWorld('posUpdates', {
   completeInitialAdmin: () => ipcRenderer.invoke('pos-complete-initial-admin'),
   onStatus: callback => ipcRenderer.on('pos-update-status', (_event, message) => callback(message))
 });
+
