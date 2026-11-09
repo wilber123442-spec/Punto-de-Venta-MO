@@ -243,9 +243,9 @@ internal static class Installer
     private static void WriteUninstaller(string installDirectory)
     {
         string script = @"$ErrorActionPreference = 'SilentlyContinue'
-$confirm = [System.Windows.Forms.MessageBox]::Show('¿Quieres desinstalar Punto de Venta MO? Los datos guardados se conservarán, a menos que elijas borrarlos en el siguiente paso.', 'Desinstalar Punto de Venta MO', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+$confirm = [System.Windows.Forms.MessageBox]::Show('¿Quieres desinstalar Punto de Venta MO? Los datos guardados se conservarán, a menos que elijas borrarlos en el siguiente paso.', 'Desinstalar Punto de Venta MO', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
 if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { exit }
-$removeData = [System.Windows.Forms.MessageBox]::Show('¿También deseas borrar los productos, ventas y configuración guardados en esta computadora?', 'Datos guardados', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
+$removeData = [System.Windows.Forms.MessageBox]::Show('¿También deseas borrar los productos, ventas y configuración guardados en esta computadora?', 'Datos guardados', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
 $programDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $startMenu = Join-Path (Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs') 'Punto de Venta MO'
 Stop-Process -Name 'Punto de Venta MO' -Force
