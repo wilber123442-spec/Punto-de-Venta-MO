@@ -50,7 +50,17 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
       - name: Crear el instalador de Windows
-        run: pnpm run dist:win
+        shell: pwsh
+        run: |
+          $attempt = 0
+          do {
+            $attempt++
+            pnpm run dist:win
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -ge 3) { exit $LASTEXITCODE }
+            Write-Host "Falló la compilación (intento $attempt); reintento en 15 segundos."
+            Start-Sleep -Seconds 15
+          } while ($true)
       - name: Preparar el instalador para la publicación
         shell: pwsh
         run: |
