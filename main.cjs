@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -20,6 +20,7 @@ try {
 let mainWindow;
 let downloadedInstallerPath = null;
 const initialAdminPath = path.join(app.getPath('userData'), 'initial-admin.txt');
+const updateResumePath = path.join(app.getPath('userData'), 'update-resume.bin');
 let initialAdmin = null;
 try {
   const values = fs.readFileSync(initialAdminPath, 'utf8').split(/\r?\n/);
@@ -136,7 +137,7 @@ ipcMain.handle('pos-complete-initial-admin', () => {
   return true;
 });
 
-ipcMain.handle('pos-install-update', () => {
+ipcMain.handle('pos-install-update', (_event, resumeState) => {
   if (!downloadedInstallerPath || !fs.existsSync(downloadedInstallerPath)) {
     report('error', 'Primero busca y descarga una actualización disponible.');
     return false;
@@ -151,16 +152,26 @@ ipcMain.handle('pos-install-update', () => {
   // helper which waits until Electron has fully exited before starting Setup.
   const updateDirectory = path.dirname(downloadedInstallerPath);
   const waitScriptPath = path.join(updateDirectory, 'esperar-y-actualizar.ps1');
+  const installDirectory = path.dirname(app.getPath('exe'));
+  const userDataDirectory = app.getPath('userData');
+  if (safeStorage.isEncryptionAvailable() && resumeState && typeof resumeState === 'object') {
+    const allowedSections = new Set(['dashboardPage', 'productsPage', 'salesPage', 'historyPage', 'monthlyPage', 'reportsPage', 'settingsPage']);
+    const state = {
+      userId: String(resumeState.userId || ''),
+      section: allowedSections.has(resumeState.section) ? resumeState.section : 'salesPage'
+    };
+    if (state.userId) fs.writeFileSync(updateResumePath, safeStorage.encryptString(JSON.stringify(state)));
+  }
   fs.writeFileSync(waitScriptPath, [
-    'param([int]$AppProcessId, [string]$InstallerPath)',
+    'param([int]$AppProcessId, [string]$InstallerPath, [string]$InstallDirectory, [string]$DataDirectory)',
     '$ErrorActionPreference = "Stop"',
-    'while (Get-Process -Id $AppProcessId -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 300 }',
-    'Start-Process -FilePath $InstallerPath -WorkingDirectory (Split-Path -Parent $InstallerPath)'
+    '$arguments = @("--update", "--wait-for-pid=$AppProcessId", "--install-dir=`"$InstallDirectory`"", "--data-dir=`"$DataDirectory`"")',
+    'Start-Process -FilePath $InstallerPath -ArgumentList $arguments -WorkingDirectory (Split-Path -Parent $InstallerPath) -Verb RunAs'
   ].join('\r\n'), 'utf8');
 
   const launcher = spawn('powershell.exe', [
     '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', waitScriptPath, String(process.pid), downloadedInstallerPath
+    '-File', waitScriptPath, String(process.pid), downloadedInstallerPath, installDirectory, userDataDirectory
   ], {
     cwd: app.getPath('temp'),
     detached: true,
@@ -176,9 +187,22 @@ ipcMain.handle('pos-install-update', () => {
   return true;
 });
 
+ipcMain.handle('pos-get-update-resume-state', () => {
+  try {
+    if (!fs.existsSync(updateResumePath) || !safeStorage.isEncryptionAvailable()) return null;
+    const state = JSON.parse(safeStorage.decryptString(fs.readFileSync(updateResumePath)));
+    fs.rmSync(updateResumePath, { force: true });
+    return state;
+  } catch {
+    try { fs.rmSync(updateResumePath, { force: true }); } catch {}
+    return null;
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
   setTimeout(() => checkForAppUpdate().catch(() => {}), 12000);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+

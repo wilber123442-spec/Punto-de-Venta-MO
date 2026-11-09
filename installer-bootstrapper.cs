@@ -1,9 +1,11 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -22,6 +24,10 @@ internal static class Installer
     private static string language = "es";
     private static string initialCurrency;
     private static bool firstInstall;
+    private static bool updateInstall;
+    private static int processToWaitFor;
+    private static string installDirectoryOverride;
+    private static string localDataDirectoryOverride;
     private static string initialBusinessName;
     private static string initialAdminName;
     private static string initialAdminUsername;
@@ -164,6 +170,25 @@ internal static class Installer
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
+        string[] arguments = Environment.GetCommandLineArgs();
+        updateInstall = Array.Exists(arguments, value => value == "--update");
+        foreach (string argument in arguments)
+        {
+            if (argument.StartsWith("--wait-for-pid=", StringComparison.OrdinalIgnoreCase))
+                Int32.TryParse(argument.Substring("--wait-for-pid=".Length), out processToWaitFor);
+            else if (argument.StartsWith("--install-dir=", StringComparison.OrdinalIgnoreCase))
+                installDirectoryOverride = argument.Substring("--install-dir=".Length);
+            else if (argument.StartsWith("--data-dir=", StringComparison.OrdinalIgnoreCase))
+                localDataDirectoryOverride = argument.Substring("--data-dir=".Length);
+        }
+
+        if (updateInstall)
+        {
+            firstInstall = false;
+            language = "es";
+            return InstallUpdateWithProgress();
+        }
+
         using (RegistryKey installed = Registry.CurrentUser.OpenSubKey(UninstallKey))
             firstInstall = installed == null;
         language = ChooseLanguage();
@@ -210,18 +235,101 @@ internal static class Installer
 
     private static string GetInstallDirectory()
     {
-        return Path.Combine(
+        return !String.IsNullOrEmpty(installDirectoryOverride) ? installDirectoryOverride : Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Programs",
             InstallFolderName);
     }
 
+    private static string GetLocalDataDirectory()
+    {
+        return !String.IsNullOrEmpty(localDataDirectoryOverride) ? localDataDirectoryOverride : Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            InstallFolderName);
+    }
+
+    private static int InstallUpdateWithProgress()
+    {
+        using (Form form = new Form())
+        using (Label message = new Label())
+        using (ProgressBar progress = new ProgressBar())
+        using (BackgroundWorker worker = new BackgroundWorker())
+        {
+            form.Text = "Mi Caja C$ · Actualización";
+            form.FormBorderStyle = FormBorderStyle.FixedDialog;
+            form.StartPosition = FormStartPosition.CenterScreen;
+            form.ClientSize = new System.Drawing.Size(470, 135);
+            form.MaximizeBox = false;
+            form.MinimizeBox = false;
+            form.ControlBox = false;
+            message.Text = "Instalando actualización. No cierres esta ventana; Mi Caja se abrirá al terminar.";
+            message.Location = new System.Drawing.Point(22, 22);
+            message.Size = new System.Drawing.Size(426, 42);
+            progress.Location = new System.Drawing.Point(22, 78);
+            progress.Size = new System.Drawing.Size(426, 24);
+            progress.Style = ProgressBarStyle.Marquee;
+            progress.MarqueeAnimationSpeed = 28;
+            form.Controls.Add(message);
+            form.Controls.Add(progress);
+            worker.DoWork += delegate
+            {
+                if (processToWaitFor > 0)
+                {
+                    DateTime deadline = DateTime.UtcNow.AddMinutes(3);
+                    while (true)
+                    {
+                        try
+                        {
+                            using (Process runningApp = Process.GetProcessById(processToWaitFor))
+                            {
+                                if (runningApp.WaitForExit(400)) break;
+                            }
+                        }
+                        catch (ArgumentException) { break; }
+                        if (DateTime.UtcNow >= deadline)
+                            throw new TimeoutException("Mi Caja sigue abierto. Cierra el programa y vuelve a intentar la actualización.");
+                    }
+                }
+                InstallApplication();
+            };
+            worker.RunWorkerCompleted += delegate(object sender, RunWorkerCompletedEventArgs result)
+            {
+                if (result.Error != null)
+                {
+                    form.Hide();
+                    MessageBox.Show(
+                        "No se pudo completar la actualización. Tus datos siguen guardados.\n\n" + result.Error.GetBaseException().Message,
+                        ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    form.DialogResult = DialogResult.Abort;
+                    form.Close();
+                    return;
+                }
+                try
+                {
+                    string appExe = Path.Combine(GetInstallDirectory(), ProductName + ".exe");
+                    Process.Start(new ProcessStartInfo("explorer.exe", "\"" + appExe + "\"") { UseShellExecute = true });
+                    form.DialogResult = DialogResult.OK;
+                    form.Close();
+                }
+                catch (Exception ex)
+                {
+                    form.Hide();
+                    MessageBox.Show("La actualización terminó, pero no pude abrir Mi Caja. Puedes iniciarlo desde el acceso directo.\n\n" + ex.Message,
+                        ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    form.DialogResult = DialogResult.Abort;
+                    form.Close();
+                }
+            };
+            form.Shown += delegate { worker.RunWorkerAsync(); };
+            Application.Run(form);
+            return form.DialogResult == DialogResult.OK ? 0 : 1;
+        }
+    }
+
     private static void InstallApplication()
     {
         string installDirectory = GetInstallDirectory();
-        string localDataDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            InstallFolderName);
+        string localDataDirectory = GetLocalDataDirectory();
         string tempDirectory = Path.Combine(Path.GetTempPath(), "PuntoDeVentaMO-" + Guid.NewGuid().ToString("N"));
         string archivePath = Path.Combine(tempDirectory, "app.zip");
         Directory.CreateDirectory(tempDirectory);
@@ -249,9 +357,12 @@ internal static class Installer
                     Convert.ToBase64String(Encoding.UTF8.GetBytes(value))));
                 File.WriteAllText(Path.Combine(localDataDirectory, "initial-admin.txt"), encoded, Encoding.UTF8);
             }
-            WriteUninstaller(installDirectory);
-            CreateShortcuts(installDirectory);
-            RegisterApplication(installDirectory, localDataDirectory);
+            if (!updateInstall)
+            {
+                WriteUninstaller(installDirectory);
+                CreateShortcuts(installDirectory);
+                RegisterApplication(installDirectory, localDataDirectory);
+            }
         }
         finally
         {
