@@ -19,6 +19,17 @@ try {
 } catch {}
 let mainWindow;
 let downloadedInstallerPath = null;
+const initialAdminPath = path.join(app.getPath('userData'), 'initial-admin.txt');
+let initialAdmin = null;
+try {
+  const values = fs.readFileSync(initialAdminPath, 'utf8').split(/\r?\n/);
+  const decode = value => Buffer.from(value || '', 'base64').toString('utf8');
+  if (values.length >= 4) {
+    const [businessName, name, username, password] = values.slice(0, 4).map(decode);
+    if (businessName && name && username && password.length >= 6)
+      initialAdmin = { businessName, name, username, password };
+  }
+} catch {}
 
 function report(state, text) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pos-update-status', { state, text });
@@ -118,6 +129,12 @@ function createWindow() {
 }
 
 ipcMain.handle('pos-check-updates', () => checkForAppUpdate());
+ipcMain.handle('pos-get-initial-admin', () => initialAdmin);
+ipcMain.handle('pos-complete-initial-admin', () => {
+  try { fs.rmSync(initialAdminPath, { force: true }); } catch {}
+  initialAdmin = null;
+  return true;
+});
 
 ipcMain.handle('pos-install-update', () => {
   if (!downloadedInstallerPath || !fs.existsSync(downloadedInstallerPath)) {

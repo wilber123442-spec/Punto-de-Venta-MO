@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Text;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -20,6 +21,10 @@ internal static class Installer
     private static string language = "es";
     private static string initialCurrency;
     private static bool firstInstall;
+    private static string initialBusinessName;
+    private static string initialAdminName;
+    private static string initialAdminUsername;
+    private static string initialAdminPassword;
 
     private static string Localized(string spanish, string english, string portuguese)
     {
@@ -35,12 +40,20 @@ internal static class Installer
         using (ComboBox choices = new ComboBox())
         using (Label currencyPrompt = new Label())
         using (ComboBox currencyChoices = new ComboBox())
+        using (Label businessPrompt = new Label())
+        using (TextBox businessInput = new TextBox())
+        using (Label adminNamePrompt = new Label())
+        using (TextBox adminNameInput = new TextBox())
+        using (Label adminUsernamePrompt = new Label())
+        using (TextBox adminUsernameInput = new TextBox())
+        using (Label adminPasswordPrompt = new Label())
+        using (TextBox adminPasswordInput = new TextBox())
         using (Button continueButton = new Button())
         {
             form.Text = "Punto de Venta MO · Setup";
             form.FormBorderStyle = FormBorderStyle.FixedDialog;
             form.StartPosition = FormStartPosition.CenterScreen;
-            form.ClientSize = new System.Drawing.Size(470, firstInstall ? 250 : 155);
+            form.ClientSize = firstInstall ? new System.Drawing.Size(520, 500) : new System.Drawing.Size(470, 155);
             form.MaximizeBox = false;
             form.MinimizeBox = false;
             prompt.Text = "Idioma de instalación / Installer language / Idioma da instalação";
@@ -67,17 +80,61 @@ internal static class Installer
             });
             currencyChoices.SelectedIndex = 0;
             currencyChoices.Location = new System.Drawing.Point(22, 114);
-            currencyChoices.Width = 425;
+            currencyChoices.Width = firstInstall ? 476 : 425;
             currencyPrompt.Visible = firstInstall;
             currencyChoices.Visible = firstInstall;
+            businessPrompt.Text = "Nombre del negocio / Business name / Nome do negócio";
+            businessPrompt.AutoSize = true;
+            businessPrompt.Location = new System.Drawing.Point(22, 151);
+            businessInput.Location = new System.Drawing.Point(22, 173);
+            businessInput.Width = 476;
+            adminNamePrompt.Text = "Nombre del administrador / Administrator name / Nome do administrador";
+            adminNamePrompt.AutoSize = true;
+            adminNamePrompt.Location = new System.Drawing.Point(22, 211);
+            adminNameInput.Location = new System.Drawing.Point(22, 233);
+            adminNameInput.Width = 476;
+            adminUsernamePrompt.Text = "Usuario del administrador / Administrator username / Usuário do administrador";
+            adminUsernamePrompt.AutoSize = true;
+            adminUsernamePrompt.Location = new System.Drawing.Point(22, 271);
+            adminUsernameInput.Location = new System.Drawing.Point(22, 293);
+            adminUsernameInput.Width = 476;
+            adminPasswordPrompt.Text = "Contraseña del administrador / Administrator password / Senha do administrador (mínimo 6 caracteres)";
+            adminPasswordPrompt.AutoSize = true;
+            adminPasswordPrompt.Location = new System.Drawing.Point(22, 331);
+            adminPasswordInput.Location = new System.Drawing.Point(22, 353);
+            adminPasswordInput.Width = 476;
+            adminPasswordInput.UseSystemPasswordChar = true;
+            businessPrompt.Visible = businessInput.Visible = firstInstall;
+            adminNamePrompt.Visible = adminNameInput.Visible = firstInstall;
+            adminUsernamePrompt.Visible = adminUsernameInput.Visible = firstInstall;
+            adminPasswordPrompt.Visible = adminPasswordInput.Visible = firstInstall;
             continueButton.Text = "Continuar / Continue / Continuar";
-            continueButton.DialogResult = DialogResult.OK;
-            continueButton.Location = new System.Drawing.Point(305, firstInstall ? 195 : 100);
+            continueButton.Location = new System.Drawing.Point(firstInstall ? 356 : 305, firstInstall ? 420 : 100);
             continueButton.Width = 142;
+            continueButton.Click += (sender, args) =>
+            {
+                if (firstInstall && (String.IsNullOrWhiteSpace(businessInput.Text) ||
+                    String.IsNullOrWhiteSpace(adminNameInput.Text) ||
+                    String.IsNullOrWhiteSpace(adminUsernameInput.Text) || adminPasswordInput.Text.Length < 6))
+                {
+                    MessageBox.Show(form, "Completa los datos del negocio y del administrador. La contraseña debe tener al menos 6 caracteres.", "Punto de Venta MO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                form.DialogResult = DialogResult.OK;
+                form.Close();
+            };
             form.Controls.Add(prompt);
             form.Controls.Add(choices);
             form.Controls.Add(currencyPrompt);
             form.Controls.Add(currencyChoices);
+            form.Controls.Add(businessPrompt);
+            form.Controls.Add(businessInput);
+            form.Controls.Add(adminNamePrompt);
+            form.Controls.Add(adminNameInput);
+            form.Controls.Add(adminUsernamePrompt);
+            form.Controls.Add(adminUsernameInput);
+            form.Controls.Add(adminPasswordPrompt);
+            form.Controls.Add(adminPasswordInput);
             form.Controls.Add(continueButton);
             form.AcceptButton = continueButton;
             if (form.ShowDialog() != DialogResult.OK) return null;
@@ -85,6 +142,10 @@ internal static class Installer
             {
                 string[] currencyCodes = { "NIO", "USD", "MXN", "CRC", "HNL", "GTQ", "PAB", "COP", "ARS", "CLP", "PEN", "DOP", "BRL", "EUR", "CAD", "GBP" };
                 initialCurrency = currencyCodes[currencyChoices.SelectedIndex];
+                initialBusinessName = businessInput.Text.Trim();
+                initialAdminName = adminNameInput.Text.Trim();
+                initialAdminUsername = adminUsernameInput.Text.Trim().ToLowerInvariant();
+                initialAdminPassword = adminPasswordInput.Text;
             }
             return choices.SelectedIndex == 1 ? "en" : choices.SelectedIndex == 2 ? "pt" : "es";
         }
@@ -171,6 +232,15 @@ internal static class Installer
             Directory.CreateDirectory(localDataDirectory);
             if (!String.IsNullOrEmpty(initialCurrency))
                 File.WriteAllText(Path.Combine(localDataDirectory, "initial-currency.txt"), initialCurrency);
+            if (firstInstall)
+            {
+                string[] values = {
+                    initialBusinessName, initialAdminName, initialAdminUsername, initialAdminPassword
+                };
+                string encoded = String.Join(Environment.NewLine, Array.ConvertAll(values, value =>
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(value))));
+                File.WriteAllText(Path.Combine(localDataDirectory, "initial-admin.txt"), encoded, Encoding.UTF8);
+            }
             WriteUninstaller(installDirectory);
             CreateShortcuts(installDirectory);
             RegisterApplication(installDirectory, localDataDirectory);
