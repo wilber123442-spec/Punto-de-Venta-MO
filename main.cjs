@@ -124,10 +124,36 @@ ipcMain.handle('pos-install-update', () => {
     report('error', 'Primero busca y descarga una actualización disponible.');
     return false;
   }
-  const installer = spawn(downloadedInstallerPath, [], { detached: true, stdio: 'ignore' });
-  installer.once('error', error => report('error', `No se pudo abrir el instalador: ${error.message}`));
-  installer.once('spawn', () => {
-    installer.unref();
+
+  if (process.platform !== 'win32') {
+    report('error', 'La instalación automática está disponible en Windows.');
+    return false;
+  }
+
+  // The installer replaces files under the app folder. Launch a small detached
+  // helper which waits until Electron has fully exited before starting Setup.
+  const updateDirectory = path.dirname(downloadedInstallerPath);
+  const waitScriptPath = path.join(updateDirectory, 'esperar-y-actualizar.ps1');
+  fs.writeFileSync(waitScriptPath, [
+    'param([int]$AppProcessId, [string]$InstallerPath)',
+    '$ErrorActionPreference = "Stop"',
+    'while (Get-Process -Id $AppProcessId -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 300 }',
+    'Start-Process -FilePath $InstallerPath -WorkingDirectory (Split-Path -Parent $InstallerPath)'
+  ].join('\r\n'), 'utf8');
+
+  const launcher = spawn('powershell.exe', [
+    '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+    '-File', waitScriptPath, String(process.pid), downloadedInstallerPath
+  ], {
+    cwd: app.getPath('temp'),
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true
+  });
+  launcher.once('error', error => report('error', `No se pudo preparar la actualización: ${error.message}`));
+  launcher.once('spawn', () => {
+    launcher.unref();
+    report('installing', 'Cerrando el programa para aplicar la actualización…');
     app.quit();
   });
   return true;
