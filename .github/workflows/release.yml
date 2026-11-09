@@ -45,7 +45,7 @@ jobs:
             $version = [version]::new($version.Major, $version.Minor, ($version.Build + 1))
           }
           $next = $version.ToString(3)
-          npm version $next --no-git-tag-version
+          if ($next -ne $base) { npm version $next --no-git-tag-version } else { Write-Host "package.json ya tiene la versión $next; continúo sin cambiarla." }
           "APP_VERSION=$next" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
