@@ -1,4 +1,4 @@
-# Punto de Venta MO para Windows
+# Mi Caja C$ para Windows
 
 Empaquetado local con Electron. El instalador se genera en `outputs/instalador-windows`.
 

@@ -7,16 +7,17 @@ using System.Text;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("Punto de Venta MO")]
-[assembly: AssemblyDescription("Instalador de Punto de Venta MO para Windows")]
-[assembly: AssemblyCompany("Punto de Venta MO")]
-[assembly: AssemblyProduct("Punto de Venta MO")]
+[assembly: AssemblyTitle("Mi Caja C$")]
+[assembly: AssemblyDescription("Instalador de Mi Caja C$ para Windows")]
+[assembly: AssemblyCompany("Mi Caja C$")]
+[assembly: AssemblyProduct("Mi Caja C$")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
 
 internal static class Installer
 {
-    private const string ProductName = "Punto de Venta MO";
+    private const string ProductName = "Mi Caja C$";
+    private const string InstallFolderName = "Punto de Venta MO";
     private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\PuntoDeVentaMO";
     private static string language = "es";
     private static string initialCurrency;
@@ -50,7 +51,7 @@ internal static class Installer
         using (TextBox adminPasswordInput = new TextBox())
         using (Button continueButton = new Button())
         {
-            form.Text = "Punto de Venta MO · Setup";
+            form.Text = "Mi Caja C$ · Setup";
             form.FormBorderStyle = FormBorderStyle.FixedDialog;
             form.StartPosition = FormStartPosition.CenterScreen;
             form.ClientSize = firstInstall ? new System.Drawing.Size(520, 500) : new System.Drawing.Size(470, 155);
@@ -117,7 +118,7 @@ internal static class Installer
                     String.IsNullOrWhiteSpace(adminNameInput.Text) ||
                     String.IsNullOrWhiteSpace(adminUsernameInput.Text) || adminPasswordInput.Text.Length < 6))
                 {
-                    MessageBox.Show(form, "Completa los datos del negocio y del administrador. La contraseña debe tener al menos 6 caracteres.", "Punto de Venta MO", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(form, "Completa los datos del negocio y del administrador. La contraseña debe tener al menos 6 caracteres.", ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
                 form.DialogResult = DialogResult.OK;
@@ -163,10 +164,10 @@ internal static class Installer
 
         DialogResult choice = MessageBox.Show(
             Localized(
-                "¿Deseas instalar Punto de Venta MO en esta computadora? Reinstalar conserva los datos guardados localmente.",
-                "Install Punto de Venta MO on this computer? Reinstalling keeps locally saved data.",
-                "Deseja instalar o Ponto de Venda MO neste computador? Reinstalar preserva os dados salvos localmente."),
-            Localized("Punto de Venta MO - Instalador", "Punto de Venta MO - Installer", "Ponto de Venda MO - Instalador"),
+                "¿Deseas instalar Mi Caja C$ en esta computadora? Reinstalar conserva los datos guardados localmente.",
+                "Install Mi Caja C$ on this computer? Reinstalling keeps locally saved data.",
+                "Deseja instalar o Mi Caja C$ neste computador? Reinstalar preserva os dados salvos localmente."),
+            Localized("Mi Caja C$ - Instalador", "Mi Caja C$ - Installer", "Mi Caja C$ - Instalador"),
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);
         if (choice != DialogResult.Yes) return 0;
@@ -176,9 +177,9 @@ internal static class Installer
             InstallApplication();
             DialogResult openNow = MessageBox.Show(
                 Localized(
-                    "Punto de Venta MO quedó instalado.\n\n¿Quieres abrirlo ahora?",
-                    "Punto de Venta MO is installed.\n\nWould you like to open it now?",
-                    "O Ponto de Venda MO foi instalado.\n\nDeseja abri-lo agora?"),
+                    "Mi Caja C$ quedó instalado.\n\n¿Quieres abrirlo ahora?",
+                    "Mi Caja C$ is installed.\n\nWould you like to open it now?",
+                    "O Mi Caja C$ foi instalado.\n\nDeseja abri-lo agora?"),
                 Localized("Instalación completa", "Installation complete", "Instalação concluída"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Information);
@@ -205,7 +206,7 @@ internal static class Installer
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Programs",
-            ProductName);
+            InstallFolderName);
     }
 
     private static void InstallApplication()
@@ -213,7 +214,7 @@ internal static class Installer
         string installDirectory = GetInstallDirectory();
         string localDataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            ProductName);
+            InstallFolderName);
         string tempDirectory = Path.Combine(Path.GetTempPath(), "PuntoDeVentaMO-" + Guid.NewGuid().ToString("N"));
         string archivePath = Path.Combine(tempDirectory, "app.zip");
         Directory.CreateDirectory(tempDirectory);
@@ -254,17 +255,23 @@ internal static class Installer
     private static void CreateShortcuts(string installDirectory)
     {
         string appExe = Path.Combine(installDirectory, ProductName + ".exe");
-        string icon = Path.Combine(installDirectory, "resources", "punto-venta-mo.ico");
+        string icon = Path.Combine(installDirectory, "resources", "mi-caja.ico");
         string startMenu = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
             "Programs",
             ProductName);
+        string oldStartMenu = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+            "Programs",
+            InstallFolderName);
+        try { Directory.Delete(oldStartMenu, true); } catch { }
+        try { File.Delete(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), InstallFolderName + ".lnk")); } catch { }
         Directory.CreateDirectory(startMenu);
         CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ProductName + ".lnk"), appExe, installDirectory, icon);
         CreateShortcut(Path.Combine(startMenu, ProductName + ".lnk"), appExe, installDirectory, icon);
-        string uninstaller = Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1");
+        string uninstaller = Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1");
         CreateShortcut(
-            Path.Combine(startMenu, "Desinstalar Punto de Venta MO.lnk"),
+            Path.Combine(startMenu, "Desinstalar Mi Caja C$.lnk"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "powershell.exe"),
             installDirectory,
             icon,
@@ -292,7 +299,7 @@ internal static class Installer
     private static void RegisterApplication(string installDirectory, string localDataDirectory)
     {
         string appExe = Path.Combine(installDirectory, ProductName + ".exe");
-        string uninstaller = Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1");
+        string uninstaller = Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1");
         string uninstallCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + uninstaller + "\"";
         using (RegistryKey key = Registry.CurrentUser.CreateSubKey(UninstallKey))
         {
@@ -313,20 +320,24 @@ internal static class Installer
     private static void WriteUninstaller(string installDirectory)
     {
         string script = @"$ErrorActionPreference = 'SilentlyContinue'
-$confirm = [System.Windows.Forms.MessageBox]::Show('¿Quieres desinstalar Punto de Venta MO? Los datos guardados se conservarán, a menos que elijas borrarlos en el siguiente paso.', 'Desinstalar Punto de Venta MO', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+$confirm = [System.Windows.Forms.MessageBox]::Show('¿Quieres desinstalar Mi Caja C$? Los datos guardados se conservarán, a menos que elijas borrarlos en el siguiente paso.', 'Desinstalar Mi Caja C$', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
 if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { exit }
 $removeData = [System.Windows.Forms.MessageBox]::Show('¿También deseas borrar los productos, ventas y configuración guardados en esta computadora?', 'Datos guardados', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
 $programDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$startMenu = Join-Path (Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs') 'Punto de Venta MO'
-Stop-Process -Name 'Punto de Venta MO' -Force
+$startPrograms = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
+$startMenu = Join-Path $startPrograms 'Mi Caja C$'
+$oldStartMenu = Join-Path $startPrograms 'Punto de Venta MO'
+Stop-Process -Name 'Mi Caja C$' -Force
+Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Mi Caja C$.lnk') -Force
 Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Punto de Venta MO.lnk') -Force
 Remove-Item -LiteralPath $startMenu -Recurse -Force
+Remove-Item -LiteralPath $oldStartMenu -Recurse -Force
 Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PuntoDeVentaMO' -Recurse -Force
 if ($removeData -eq [System.Windows.Forms.DialogResult]::Yes) { Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'Punto de Venta MO') -Recurse -Force }
 Set-Location $env:TEMP
 Start-Process -FilePath $env:ComSpec -WindowStyle Hidden -ArgumentList @('/c', 'timeout /t 2 /nobreak >nul & rmdir /s /q ""' + $programDir + '""')
 ";
         script = "Add-Type -AssemblyName System.Windows.Forms`r`n" + script;
-        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Punto-de-Venta-MO.ps1"), script);
+        File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1"), script);
     }
 }

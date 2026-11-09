@@ -60,8 +60,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.APP_VERSION }}
-          name: Punto de Venta MO ${{ env.APP_VERSION }}
+          name: Mi Caja C$ ${{ env.APP_VERSION }}
           generate_release_notes: true
           files: outputs/instalador-windows/Punto-de-Venta-MO-Setup-${{ env.APP_VERSION }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

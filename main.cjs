@@ -5,7 +5,7 @@ const { spawn } = require('node:child_process');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
-app.setName('Punto de Venta MO');
+app.setName('Mi Caja C$');
 // Keep business data separate from the program files so reinstalling preserves it.
 app.setPath('userData', path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Punto de Venta MO'));
 const UPDATE_OWNER = 'wilber123442-spec';
@@ -108,7 +108,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
-    icon: path.join(process.resourcesPath, 'punto-venta-mo.ico'),
+    icon: path.join(process.resourcesPath, 'mi-caja.ico'),
     minWidth: 900,
     minHeight: 650,
     show: false,

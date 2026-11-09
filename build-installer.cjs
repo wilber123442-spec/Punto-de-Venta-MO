@@ -8,7 +8,8 @@ const projectDir = __dirname;
 const packageInfo = require(path.join(projectDir, 'package.json'));
 const appDir = path.resolve(projectDir, '..', '..', 'outputs', 'instalador-windows', 'win-unpacked');
 const resourcesDir = path.join(appDir, 'resources');
-const iconPath = path.join(projectDir, 'assets', 'punto-venta-mo.ico');
+const iconPath = path.join(projectDir, 'assets', 'mi-caja.ico');
+const manifestPath = path.join(projectDir, 'installer.manifest');
 const rceditPath = path.join(projectDir, 'node_modules', 'electron-winstaller', 'vendor', 'rcedit.exe');
 const asarPath = path.join(resourcesDir, 'app.asar');
 const asarCli = path.join(projectDir, 'node_modules', '@electron', 'asar', 'bin', 'asar.js');
@@ -16,7 +17,7 @@ const extractedApp = path.join(projectDir, `.asar-installer-${Date.now()}`);
 const payloadPath = path.join(projectDir, `.payload-${packageInfo.version}.zip`);
 const installerPath = path.resolve(projectDir, '..', '..', 'outputs', 'instalador-windows', `Punto-de-Venta-MO-Setup-${packageInfo.version}.exe`);
 const generatedBootstrapPath = path.join(projectDir, `.installer-bootstrapper-${packageInfo.version}.cs`);
-const exeName = 'Punto de Venta MO.exe';
+const exeName = 'Mi Caja C$.exe';
 
 function psQuote(value) {
   return `'${value.replace(/'/g, "''")}'`;
@@ -34,7 +35,7 @@ async function main() {
   }
   await execFileAsync(process.execPath, [asarCli, 'pack', extractedApp, path.join(resourcesDir, 'app-build.asar')]);
   fs.renameSync(path.join(resourcesDir, 'app-build.asar'), asarPath);
-  fs.copyFileSync(iconPath, path.join(resourcesDir, 'punto-venta-mo.ico'));
+  fs.copyFileSync(iconPath, path.join(resourcesDir, 'mi-caja.ico'));
   await execFileAsync(rceditPath, [path.join(appDir, exeName), '--set-icon', iconPath]);
 
   const powershell = `Compress-Archive -Path ${psQuote(path.join(appDir, '*'))} -DestinationPath ${psQuote(payloadPath)} -CompressionLevel Optimal -Force`;
@@ -53,6 +54,7 @@ async function main() {
     '/target:winexe',
     '/platform:x64',
     `/win32icon:${iconPath}`,
+    `/win32manifest:${manifestPath}`,
     `/out:${installerPath}`,
     `/resource:${payloadPath},APP_ARCHIVE`,
     '/reference:System.Windows.Forms.dll',
