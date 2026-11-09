@@ -49,6 +49,7 @@ internal static class Installer
         using (TextBox adminUsernameInput = new TextBox())
         using (Label adminPasswordPrompt = new Label())
         using (TextBox adminPasswordInput = new TextBox())
+        using (Label accountPrivacyNote = new Label())
         using (Button continueButton = new Button())
         {
             form.Text = "Mi Caja C$ · Setup";
@@ -105,6 +106,11 @@ internal static class Installer
             adminPasswordInput.Location = new System.Drawing.Point(22, 353);
             adminPasswordInput.Width = 476;
             adminPasswordInput.UseSystemPasswordChar = true;
+            accountPrivacyNote.Text = "Este negocio y su administrador serán propios de esta tienda. No se copian datos de otras instalaciones. / This store has its own administrator and data. / Esta loja terá administrador e dados próprios.";
+            accountPrivacyNote.Location = new System.Drawing.Point(22, 388);
+            accountPrivacyNote.Size = new System.Drawing.Size(476, 28);
+            accountPrivacyNote.ForeColor = System.Drawing.Color.FromArgb(75, 85, 99);
+            accountPrivacyNote.Visible = firstInstall;
             businessPrompt.Visible = businessInput.Visible = firstInstall;
             adminNamePrompt.Visible = adminNameInput.Visible = firstInstall;
             adminUsernamePrompt.Visible = adminUsernameInput.Visible = firstInstall;
@@ -136,6 +142,7 @@ internal static class Installer
             form.Controls.Add(adminUsernameInput);
             form.Controls.Add(adminPasswordPrompt);
             form.Controls.Add(adminPasswordInput);
+            form.Controls.Add(accountPrivacyNote);
             form.Controls.Add(continueButton);
             form.AcceptButton = continueButton;
             if (form.ShowDialog() != DialogResult.OK) return null;

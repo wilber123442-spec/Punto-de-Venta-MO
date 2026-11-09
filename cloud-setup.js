@@ -67,8 +67,10 @@
   }
 
   function makeInvitationToken() {
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(10));
+    const code = Array.from(bytes, byte => alphabet[byte % alphabet.length]).join('');
+    return `mc-${code.slice(0, 5)}-${code.slice(5)}`;
   }
 
   async function authenticateCloudLogin(mode) {
@@ -79,8 +81,8 @@
       toast('Escribe un correo válido y una contraseña de al menos 8 caracteres.');
       return;
     }
-    if (mode === 'signup' && !/^[a-f0-9]{64}$/.test(rawToken)) {
-      toast('Pega el código de invitación que te dio el administrador.');
+    if (mode === 'signup' && !/^mc-[a-hj-np-z2-9]{5}-[a-hj-np-z2-9]{5}$/.test(rawToken)) {
+      toast('Pega la invitación corta que te dio el administrador.');
       return;
     }
     try {
@@ -190,7 +192,7 @@
         p_role: role,
         p_token_hash: await sha256Hex(token)
       });
-      document.getElementById('cloudInviteTokenResult').value = token;
+      document.getElementById('cloudInviteTokenResult').value = token.toUpperCase();
       document.getElementById('cloudInviteResult').style.display = 'block';
       toast('Invitación creada. Comparte el código con el cajero.');
     } catch (error) {

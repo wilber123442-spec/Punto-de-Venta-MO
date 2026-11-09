@@ -4,6 +4,8 @@
 
 La aplicación usa almacenamiento local primero y sincronización opcional con Supabase. Sin internet puede seguir vendiendo localmente; al activar nube, los cambios de la sesión en la nube se sincronizan entre equipos. El catálogo se comparte dentro de cada tienda; cada cajero ve sus propias ventas y el administrador ve todas. Cada tienda mantiene sus datos aislados mediante `business_id` y políticas RLS.
 
+Cada cliente registra su propio negocio y administrador durante su primera instalación. No se debe distribuir una instalación preparada con datos de demostración, usuarios reales, sesión iniciada o copias de respaldo. El proyecto Supabase configurado en el programa es la infraestructura compartida del servicio; las políticas separan los negocios y cada tienda crea/vincula su propia cuenta. La conexión es opcional: sin ella, los datos permanecen en la computadora.
+
 ## Estado actual
 
 - Proyecto creado: **Mi Caja C$** (`sopebnliutlghshicyxb`), región East US (North Virginia), estado saludable.
@@ -14,7 +16,7 @@ La aplicación usa almacenamiento local primero y sincronización opcional con S
 - `supabase/MiCaja-schema.sql` reúne las tres migraciones en una sola transacción para facilitar su ejecución manual desde el SQL Editor.
 - Las migraciones `0001` a `0003` se aplicaron el 8 de noviembre de 2026. Se verificaron las 10 tablas y RLS está activado en las 10.
 - `supabase/migrations/0004_atomic_sale_operations.sql` instala las funciones seguras del servidor para cobros, lotes y anulaciones. Aplicada el 8 de noviembre de 2026.
-- La aplicación ahora incluye una sección para vincular una cuenta de administrador con Supabase Auth. La autenticación de la nube está separada del inicio local.
+- La aplicación incluye una sección opcional para que el administrador vincule la cuenta propia del negocio con Supabase Auth. La autenticación de la nube está separada del inicio local.
 - `cloud-client.js` usa solo la clave **Publishable** y mantiene los tokens de sesión temporales; no guarda la contraseña de Supabase. Las cuentas locales almacenan claves derivadas con PBKDF2; las contraseñas antiguas se convierten automáticamente al abrir la aplicación.
 - `cloud-setup.js` permite crear o vincular la cuenta propietaria del negocio desde **Configuración → Cuenta en la nube** y guarda la moneda seleccionada con las políticas RLS existentes.
 - `supabase/migrations/0005_cashier_sales_privacy.sql` limita las ventas y artículos visibles a cada cajero; los administradores conservan acceso a todo el negocio. Aplicada el 8 de noviembre de 2026 y verificada en las políticas activas.
