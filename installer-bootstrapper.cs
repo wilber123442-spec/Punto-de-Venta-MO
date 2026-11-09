@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 6461)
-Total output lines: 474
-
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -181,7 +178,134 @@ internal static class Installer
                 Int32.TryParse(argument.Substring("--wait-for-pid=".Length), out processToWaitFor);
             else if (argument.StartsWith("--install-dir=", StringComparison.OrdinalIgnoreCase))
                 installDirectoryOverride = argument.Substring("--install-dir=".Length);
-            else if (argument.StartsWith("--data-dir=", St…1461 tokens truncated…           {
+            else if (argument.StartsWith("--data-dir=", StringComparison.OrdinalIgnoreCase))
+                localDataDirectoryOverride = argument.Substring("--data-dir=".Length);
+        }
+
+        using (RegistryKey installed = Registry.CurrentUser.OpenSubKey(UninstallKey))
+            firstInstall = installed == null;
+        updateInstall = updateArgument || !firstInstall;
+        if (updateInstall)
+        {
+            firstInstall = false;
+            language = "es";
+            return InstallUpdateWithProgress();
+        }
+        language = ChooseLanguage();
+        if (language == null) return 0;
+
+        DialogResult choice = MessageBox.Show(
+            Localized(
+                "¿Deseas instalar Mi Caja C$ en esta computadora? Reinstalar conserva los datos guardados localmente.",
+                "Install Mi Caja C$ on this computer? Reinstalling keeps locally saved data.",
+                "Deseja instalar o Mi Caja C$ neste computador? Reinstalar preserva os dados salvos localmente."),
+            Localized("Mi Caja C$ - Instalador", "Mi Caja C$ - Installer", "Mi Caja C$ - Instalador"),
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+        if (choice != DialogResult.Yes) return 0;
+
+        try
+        {
+            InstallApplication();
+            DialogResult openNow = MessageBox.Show(
+                Localized(
+                    "Mi Caja C$ quedó instalado.\n\n¿Quieres abrirlo ahora?",
+                    "Mi Caja C$ is installed.\n\nWould you like to open it now?",
+                    "O Mi Caja C$ foi instalado.\n\nDeseja abri-lo agora?"),
+                Localized("Instalación completa", "Installation complete", "Instalação concluída"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Information);
+            if (openNow == DialogResult.Yes)
+            {
+                string appExe = Path.Combine(GetInstallDirectory(), ProductName + ".exe");
+                Process.Start(appExe);
+            }
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                Localized("No se pudo completar la instalación.\n\n", "Installation could not be completed.\n\n", "Não foi possível concluir a instalação.\n\n") + ex.Message,
+                Localized("Error de instalación", "Installation error", "Erro de instalação"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return 1;
+        }
+    }
+
+    private static string GetInstallDirectory()
+    {
+        return !String.IsNullOrEmpty(installDirectoryOverride) ? installDirectoryOverride : Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs",
+            InstallFolderName);
+    }
+
+    private static string GetLocalDataDirectory()
+    {
+        return !String.IsNullOrEmpty(localDataDirectoryOverride) ? localDataDirectoryOverride : Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            InstallFolderName);
+    }
+
+    private static int InstallUpdateWithProgress()
+    {
+        using (Form form = new Form())
+        using (Label message = new Label())
+        using (ProgressBar progress = new ProgressBar())
+        using (BackgroundWorker worker = new BackgroundWorker())
+        {
+            form.Text = "Mi Caja C$ · Actualización";
+            form.FormBorderStyle = FormBorderStyle.FixedDialog;
+            form.StartPosition = FormStartPosition.CenterScreen;
+            form.ClientSize = new System.Drawing.Size(470, 135);
+            form.MaximizeBox = false;
+            form.MinimizeBox = false;
+            form.ControlBox = false;
+            message.Text = "Instalando actualización. No cierres esta ventana; Mi Caja se abrirá al terminar.";
+            message.Location = new System.Drawing.Point(22, 22);
+            message.Size = new System.Drawing.Size(426, 42);
+            progress.Location = new System.Drawing.Point(22, 78);
+            progress.Size = new System.Drawing.Size(426, 24);
+            progress.Style = ProgressBarStyle.Marquee;
+            progress.MarqueeAnimationSpeed = 28;
+            form.Controls.Add(message);
+            form.Controls.Add(progress);
+            worker.DoWork += delegate
+            {
+                DateTime deadline = DateTime.UtcNow.AddMinutes(3);
+                while (true)
+                {
+                    bool appStillRunning = false;
+                    if (processToWaitFor > 0)
+                    {
+                        try
+                        {
+                            using (Process runningApp = Process.GetProcessById(processToWaitFor))
+                                appStillRunning = !runningApp.WaitForExit(400);
+                        }
+                        catch (ArgumentException) { appStillRunning = false; }
+                    }
+                    else
+                    {
+                        foreach (Process runningApp in Process.GetProcessesByName(ProductName))
+                        {
+                            using (runningApp)
+                            {
+                                try { if (!runningApp.WaitForExit(400)) appStillRunning = true; }
+                                catch (InvalidOperationException) { }
+                            }
+                            if (appStillRunning) break;
+                        }
+                    }
+                    if (!appStillRunning) break;
+                    if (DateTime.UtcNow >= deadline)
+                        throw new TimeoutException("Mi Caja sigue abierto. Cierra el programa y vuelve a intentar la actualización.");
+                }
+                InstallApplication();
+            };
+            worker.RunWorkerCompleted += delegate(object sender, RunWorkerCompletedEventArgs result)
+            {
                 if (result.Error != null)
                 {
                     form.Hide();
