@@ -61,7 +61,7 @@ internal static class Installer
             form.Text = "Mi Caja C$ · Setup";
             form.FormBorderStyle = FormBorderStyle.FixedDialog;
             form.StartPosition = FormStartPosition.CenterScreen;
-            form.ClientSize = firstInstall ? new System.Drawing.Size(520, 500) : new System.Drawing.Size(470, 155);
+            form.ClientSize = firstInstall ? new System.Drawing.Size(470, 195) : new System.Drawing.Size(470, 155);
             form.MaximizeBox = false;
             form.MinimizeBox = false;
             prompt.Text = "Idioma de instalación / Installer language / Idioma da instalação";
@@ -88,7 +88,7 @@ internal static class Installer
             });
             currencyChoices.SelectedIndex = 0;
             currencyChoices.Location = new System.Drawing.Point(22, 114);
-            currencyChoices.Width = firstInstall ? 476 : 425;
+            currencyChoices.Width = 425;
             currencyPrompt.Visible = firstInstall;
             currencyChoices.Visible = firstInstall;
             businessPrompt.Text = "Nombre del negocio / Business name / Nome do negócio";
@@ -116,23 +116,16 @@ internal static class Installer
             accountPrivacyNote.Location = new System.Drawing.Point(22, 388);
             accountPrivacyNote.Size = new System.Drawing.Size(476, 28);
             accountPrivacyNote.ForeColor = System.Drawing.Color.FromArgb(75, 85, 99);
-            accountPrivacyNote.Visible = firstInstall;
-            businessPrompt.Visible = businessInput.Visible = firstInstall;
-            adminNamePrompt.Visible = adminNameInput.Visible = firstInstall;
-            adminUsernamePrompt.Visible = adminUsernameInput.Visible = firstInstall;
-            adminPasswordPrompt.Visible = adminPasswordInput.Visible = firstInstall;
+            accountPrivacyNote.Visible = false;
+            businessPrompt.Visible = businessInput.Visible = false;
+            adminNamePrompt.Visible = adminNameInput.Visible = false;
+            adminUsernamePrompt.Visible = adminUsernameInput.Visible = false;
+            adminPasswordPrompt.Visible = adminPasswordInput.Visible = false;
             continueButton.Text = "Continuar / Continue / Continuar";
-            continueButton.Location = new System.Drawing.Point(firstInstall ? 356 : 305, firstInstall ? 420 : 100);
+            continueButton.Location = new System.Drawing.Point(305, firstInstall ? 155 : 100);
             continueButton.Width = 142;
             continueButton.Click += (sender, args) =>
             {
-                if (firstInstall && (String.IsNullOrWhiteSpace(businessInput.Text) ||
-                    String.IsNullOrWhiteSpace(adminNameInput.Text) ||
-                    String.IsNullOrWhiteSpace(adminUsernameInput.Text) || adminPasswordInput.Text.Length < 6))
-                {
-                    MessageBox.Show(form, "Completa los datos del negocio y del administrador. La contraseña debe tener al menos 6 caracteres.", ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
                 form.DialogResult = DialogResult.OK;
                 form.Close();
             };
@@ -156,10 +149,6 @@ internal static class Installer
             {
                 string[] currencyCodes = { "NIO", "USD", "MXN", "CRC", "HNL", "GTQ", "PAB", "COP", "ARS", "CLP", "PEN", "DOP", "BRL", "EUR", "CAD", "GBP" };
                 initialCurrency = currencyCodes[currencyChoices.SelectedIndex];
-                initialBusinessName = businessInput.Text.Trim();
-                initialAdminName = adminNameInput.Text.Trim();
-                initialAdminUsername = adminUsernameInput.Text.Trim().ToLowerInvariant();
-                initialAdminPassword = adminPasswordInput.Text;
             }
             return choices.SelectedIndex == 1 ? "en" : choices.SelectedIndex == 2 ? "pt" : "es";
         }
@@ -360,15 +349,6 @@ internal static class Installer
             Directory.CreateDirectory(localDataDirectory);
             if (!String.IsNullOrEmpty(initialCurrency))
                 File.WriteAllText(Path.Combine(localDataDirectory, "initial-currency.txt"), initialCurrency);
-            if (firstInstall)
-            {
-                string[] values = {
-                    initialBusinessName, initialAdminName, initialAdminUsername, initialAdminPassword
-                };
-                string encoded = String.Join(Environment.NewLine, Array.ConvertAll(values, value =>
-                    Convert.ToBase64String(Encoding.UTF8.GetBytes(value))));
-                File.WriteAllText(Path.Combine(localDataDirectory, "initial-admin.txt"), encoded, Encoding.UTF8);
-            }
             if (!updateInstall)
             {
                 WriteUninstaller(installDirectory);
