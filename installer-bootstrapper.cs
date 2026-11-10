@@ -385,7 +385,7 @@ internal static class Installer
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "powershell.exe"),
             installDirectory,
             icon,
-            "-NoProfile -ExecutionPolicy Bypass -File \"" + uninstaller + "\"");
+            "-NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File \"" + uninstaller + "\"");
     }
 
     private static void CreateShortcut(string shortcutPath, string target, string workingDirectory, string icon, string arguments = null)
@@ -410,7 +410,8 @@ internal static class Installer
     {
         string appExe = Path.Combine(installDirectory, ProductName + ".exe");
         string uninstaller = Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1");
-        string uninstallCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + uninstaller + "\"";
+        string powershellPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+        string uninstallCommand = "\"" + powershellPath + "\" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File \"" + uninstaller + "\"";
         using (RegistryKey key = Registry.CurrentUser.CreateSubKey(UninstallKey))
         {
             key.SetValue("DisplayName", ProductName);
@@ -429,24 +430,37 @@ internal static class Installer
 
     private static void WriteUninstaller(string installDirectory)
     {
-        string script = @"$ErrorActionPreference = 'SilentlyContinue'
-$confirm = [System.Windows.Forms.MessageBox]::Show('¿Quieres desinstalar Mi Caja C$? Los datos guardados se conservarán, a menos que elijas borrarlos en el siguiente paso.', 'Desinstalar Mi Caja C$', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
-if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { exit }
-$removeData = [System.Windows.Forms.MessageBox]::Show('¿También deseas borrar los productos, ventas y configuración guardados en esta computadora?', 'Datos guardados', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
-$programDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$startPrograms = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
-$startMenu = Join-Path $startPrograms 'Mi Caja C$'
-$oldStartMenu = Join-Path $startPrograms 'Punto de Venta MO'
-Stop-Process -Name 'Mi Caja C$' -Force
-Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Mi Caja C$.lnk') -Force
-Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Punto de Venta MO.lnk') -Force
-Remove-Item -LiteralPath $startMenu -Recurse -Force
-Remove-Item -LiteralPath $oldStartMenu -Recurse -Force
-Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PuntoDeVentaMO' -Recurse -Force
-if ($removeData -eq [System.Windows.Forms.DialogResult]::Yes) { Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'Punto de Venta MO') -Recurse -Force }
-Set-Location $env:TEMP
-Start-Process -FilePath $env:ComSpec -WindowStyle Hidden -ArgumentList @('/c', 'timeout /t 2 /nobreak >nul & rmdir /s /q ""' + $programDir + '""')
-";
+        string script = @"Add-Type -AssemblyName System.Windows.Forms
+$ErrorActionPreference = 'Stop'
+try {
+  $confirm = [System.Windows.Forms.MessageBox]::Show('¿Quieres desinstalar Mi Caja C$? Los datos guardados se conservarán, a menos que elijas borrarlos en el siguiente paso.', 'Desinstalar Mi Caja C$', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+  if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { exit 0 }
+  $removeData = [System.Windows.Forms.MessageBox]::Show('¿También deseas borrar los productos, ventas y configuración guardados en esta computadora?', 'Datos guardados', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+  $programDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+  $startPrograms = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
+  $startMenu = Join-Path $startPrograms 'Mi Caja C$'
+  $oldStartMenu = Join-Path $startPrograms 'Punto de Venta MO'
+  Stop-Process -Name 'Mi Caja C$' -Force -ErrorAction SilentlyContinue
+  $deadline = (Get-Date).AddSeconds(8)
+  while ((Get-Process -Name 'Mi Caja C$' -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
+  Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Mi Caja C$.lnk') -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Punto de Venta MO.lnk') -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $oldStartMenu -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PuntoDeVentaMO' -Recurse -Force -ErrorAction SilentlyContinue
+  if ($removeData -eq [System.Windows.Forms.DialogResult]::Yes) {
+    $dataPath = Join-Path $env:LOCALAPPDATA 'Punto de Venta MO'
+    Remove-Item -LiteralPath $dataPath -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  $cleanupPath = Join-Path $env:TEMP ('MiCajaCleanup-' + [guid]::NewGuid().ToString('N') + '.ps1')
+  $cleanupScript = @('Start-Sleep -Seconds 2', ('Remove-Item -LiteralPath ""' + $programDir + '"" -Recurse -Force -ErrorAction SilentlyContinue'), 'Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue') -join [Environment]::NewLine
+  [System.IO.File]::WriteAllText($cleanupPath, $cleanupScript, [System.Text.UTF8Encoding]::new($false))
+  $cleanupArgs = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ""' + $cleanupPath + '""'
+  Start-Process -FilePath 'powershell.exe' -ArgumentList $cleanupArgs -WindowStyle Hidden
+} catch {
+  [System.Windows.Forms.MessageBox]::Show('No se pudo completar la desinstalación:' + [Environment]::NewLine + [Environment]::NewLine + $_.Exception.Message, 'Desinstalar Mi Caja C$', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+  exit 1
+}"
         script = "Add-Type -AssemblyName System.Windows.Forms`r`n" + script;
         File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1"), script);
     }
