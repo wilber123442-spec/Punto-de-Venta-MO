@@ -460,7 +460,7 @@ try {
 } catch {
   [System.Windows.Forms.MessageBox]::Show('No se pudo completar la desinstalación:' + [Environment]::NewLine + [Environment]::NewLine + $_.Exception.Message, 'Desinstalar Mi Caja C$', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
   exit 1
-}"
+}";
         script = "Add-Type -AssemblyName System.Windows.Forms`r`n" + script;
         File.WriteAllText(Path.Combine(installDirectory, "Desinstalar-Mi-Caja-C.ps1"), script);
     }
