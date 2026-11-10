@@ -349,12 +349,9 @@ internal static class Installer
             Directory.CreateDirectory(localDataDirectory);
             if (!String.IsNullOrEmpty(initialCurrency))
                 File.WriteAllText(Path.Combine(localDataDirectory, "initial-currency.txt"), initialCurrency);
-            if (!updateInstall)
-            {
-                WriteUninstaller(installDirectory);
-                CreateShortcuts(installDirectory);
-                RegisterApplication(installDirectory, localDataDirectory);
-            }
+            WriteUninstaller(installDirectory);
+            CreateShortcuts(installDirectory);
+            RegisterApplication(installDirectory, localDataDirectory);
         }
         finally
         {
