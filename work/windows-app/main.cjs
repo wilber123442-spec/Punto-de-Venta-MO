@@ -1,0 +1,208 @@
+const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn } = require('node:child_process');
+const { Readable, Transform } = require('node:stream');
+const { pipeline } = require('node:stream/promises');
+
+app.setName('Mi Caja C$');
+// Keep business data separate from the program files so reinstalling preserves it.
+app.setPath('userData', path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Punto de Venta MO'));
+const UPDATE_OWNER = 'wilber123442-spec';
+const UPDATE_REPOSITORY = 'punto-de-venta-mo';
+const CURRENT_VERSION = require('./package.json').version;
+const initialCurrencyPath = path.join(app.getPath('userData'), 'initial-currency.txt');
+let initialCurrency = null;
+try {
+  initialCurrency = fs.readFileSync(initialCurrencyPath, 'utf8').trim();
+  fs.unlinkSync(initialCurrencyPath);
+} catch {}
+let mainWindow;
+let downloadedInstallerPath = null;
+const initialAdminPath = path.join(app.getPath('userData'), 'initial-admin.txt');
+const updateResumePath = path.join(app.getPath('userData'), 'update-resume.bin');
+let initialAdmin = null;
+try {
+  const values = fs.readFileSync(initialAdminPath, 'utf8').split(/\r?\n/);
+  const decode = value => Buffer.from(value || '', 'base64').toString('utf8');
+  if (values.length >= 4) {
+    const [businessName, name, username, password] = values.slice(0, 4).map(decode);
+    if (businessName && name && username && password.length >= 6)
+      initialAdmin = { businessName, name, username, password };
+  }
+} catch {}
+
+function report(state, text) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('pos-update-status', { state, text });
+}
+
+function compareVersions(left, right) {
+  const a = String(left).replace(/^v/i, '').split('.').map(part => Number.parseInt(part, 10) || 0);
+  const b = String(right).replace(/^v/i, '').split('.').map(part => Number.parseInt(part, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length, 3); i++) {
+    const difference = (a[i] || 0) - (b[i] || 0);
+    if (difference) return Math.sign(difference);
+  }
+  return 0;
+}
+
+async function checkForAppUpdate() {
+  if (!app.isPackaged) {
+    report('not-configured', 'Las actualizaciones están disponibles en la versión instalada de Windows.');
+    return false;
+  }
+
+  report('checking', 'Buscando actualizaciones…');
+  try {
+    const releaseUrl = `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPOSITORY}/releases/latest`;
+    const releaseResponse = await fetch(releaseUrl, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Punto-de-Venta-MO-Updater' },
+      signal: AbortSignal.timeout(30000)
+    });
+    if (releaseResponse.status === 404) {
+      report('not-configured', 'El canal está listo, pero todavía no se ha publicado la primera versión.');
+      return false;
+    }
+    if (!releaseResponse.ok) throw new Error(`GitHub respondió con el código ${releaseResponse.status}.`);
+
+    const release = await releaseResponse.json();
+    const latestVersion = String(release.tag_name || '').replace(/^v/i, '');
+    if (!latestVersion) throw new Error('La publicación no indica su número de versión.');
+    if (compareVersions(latestVersion, CURRENT_VERSION) <= 0) {
+      downloadedInstallerPath = null;
+      report('current', `Ya tienes la versión más reciente (${CURRENT_VERSION}).`);
+      return false;
+    }
+
+    const asset = (release.assets || []).find(item =>
+      /^Punto-de-Venta-MO-Setup-[\d.]+\.exe$/i.test(item.name || '')
+    );
+    if (!asset?.browser_download_url) throw new Error(`Se encontró la versión ${latestVersion}, pero falta su instalador de Windows.`);
+
+    const downloadResponse = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(10 * 60 * 1000) });
+    if (!downloadResponse.ok || !downloadResponse.body) throw new Error('No se pudo descargar el instalador.');
+
+    const updateDirectory = path.join(app.getPath('userData'), 'updates');
+    fs.mkdirSync(updateDirectory, { recursive: true });
+    const targetPath = path.join(updateDirectory, path.basename(asset.name));
+    const totalBytes = Number(asset.size || downloadResponse.headers.get('content-length') || 0);
+    let downloadedBytes = 0;
+    const progress = new Transform({
+      transform(chunk, encoding, callback) {
+        downloadedBytes += chunk.length;
+        const percent = totalBytes ? Math.min(100, Math.round(downloadedBytes / totalBytes * 100)) : 0;
+        report('downloading', `Descargando versión ${latestVersion}: ${percent}%`);
+        callback(null, chunk);
+      }
+    });
+    await pipeline(Readable.fromWeb(downloadResponse.body), progress, fs.createWriteStream(targetPath));
+    downloadedInstallerPath = targetPath;
+    report('downloaded', `La versión ${latestVersion} está lista. Pulsa “Instalar actualización” para aplicarla.`);
+    return true;
+  } catch (error) {
+    report('error', `No se pudo revisar o descargar la actualización: ${error.message}`);
+    throw error;
+  }
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1440,
+    height: 920,
+    icon: path.join(process.resourcesPath, 'mi-caja.ico'),
+    minWidth: 900,
+    minHeight: 650,
+    show: false,
+    autoHideMenuBar: true,
+    backgroundColor: '#f6f8f5',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.loadFile(path.join(__dirname, 'ventas-mi-negocio.html'), {
+    query: initialCurrency ? { initialCurrency } : undefined
+  });
+  mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+ipcMain.handle('pos-check-updates', () => checkForAppUpdate());
+ipcMain.handle('pos-get-initial-admin', () => initialAdmin);
+ipcMain.handle('pos-complete-initial-admin', () => {
+  try { fs.rmSync(initialAdminPath, { force: true }); } catch {}
+  initialAdmin = null;
+  return true;
+});
+
+ipcMain.handle('pos-install-update', (_event, resumeState) => {
+  if (!downloadedInstallerPath || !fs.existsSync(downloadedInstallerPath)) {
+    report('error', 'Primero busca y descarga una actualización disponible.');
+    return false;
+  }
+
+  if (process.platform !== 'win32') {
+    report('error', 'La instalación automática está disponible en Windows.');
+    return false;
+  }
+
+  // The installer replaces files under the app folder. Launch a small detached
+  // helper which waits until Electron has fully exited before starting Setup.
+  const updateDirectory = path.dirname(downloadedInstallerPath);
+  const waitScriptPath = path.join(updateDirectory, 'esperar-y-actualizar.ps1');
+  const installDirectory = path.dirname(app.getPath('exe'));
+  const userDataDirectory = app.getPath('userData');
+  if (safeStorage.isEncryptionAvailable() && resumeState && typeof resumeState === 'object') {
+    const allowedSections = new Set(['dashboardPage', 'productsPage', 'salesPage', 'historyPage', 'monthlyPage', 'reportsPage', 'settingsPage']);
+    const state = {
+      userId: String(resumeState.userId || ''),
+      section: allowedSections.has(resumeState.section) ? resumeState.section : 'salesPage'
+    };
+    if (state.userId) fs.writeFileSync(updateResumePath, safeStorage.encryptString(JSON.stringify(state)));
+  }
+  fs.writeFileSync(waitScriptPath, [
+    'param([int]$AppProcessId, [string]$InstallerPath, [string]$InstallDirectory, [string]$DataDirectory)',
+    '$ErrorActionPreference = "Stop"',
+    '$arguments = @("--update", "--wait-for-pid=$AppProcessId", "--install-dir=`"$InstallDirectory`"", "--data-dir=`"$DataDirectory`"")',
+    'Start-Process -FilePath $InstallerPath -ArgumentList $arguments -WorkingDirectory (Split-Path -Parent $InstallerPath) -Verb RunAs'
+  ].join('\r\n'), 'utf8');
+
+  const launcher = spawn('powershell.exe', [
+    '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+    '-File', waitScriptPath, String(process.pid), downloadedInstallerPath, installDirectory, userDataDirectory
+  ], {
+    cwd: app.getPath('temp'),
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true
+  });
+  launcher.once('error', error => report('error', `No se pudo preparar la actualización: ${error.message}`));
+  launcher.once('spawn', () => {
+    launcher.unref();
+    report('installing', 'Cerrando el programa para aplicar la actualización…');
+    app.quit();
+  });
+  return true;
+});
+
+ipcMain.handle('pos-get-update-resume-state', () => {
+  try {
+    if (!fs.existsSync(updateResumePath) || !safeStorage.isEncryptionAvailable()) return null;
+    const state = JSON.parse(safeStorage.decryptString(fs.readFileSync(updateResumePath)));
+    fs.rmSync(updateResumePath, { force: true });
+    return state;
+  } catch {
+    try { fs.rmSync(updateResumePath, { force: true }); } catch {}
+    return null;
+  }
+});
+
+app.whenReady().then(() => {
+  createWindow();
+  setTimeout(() => checkForAppUpdate().catch(() => {}), 12000);
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
