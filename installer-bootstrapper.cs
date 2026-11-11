@@ -446,8 +446,8 @@ Remove-Item -LiteralPath $oldStartMenu -Recurse -Force
 Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PuntoDeVentaMO' -Recurse -Force
 if ($removeData -eq [System.Windows.Forms.DialogResult]::Yes) { Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'Punto de Venta MO') -Recurse -Force }
 Set-Location $env:TEMP
-$escapedProgramDir = $programDir.Replace("'", "''")
-$removeScript = "Start-Sleep -Seconds 2; Remove-Item -LiteralPath '$escapedProgramDir' -Recurse -Force"
+$escapedProgramDir = $programDir.Replace(""'"", ""''"")
+$removeScript = ""Start-Sleep -Seconds 2; Remove-Item -LiteralPath '$escapedProgramDir' -Recurse -Force""
 $encodedRemoveScript = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($removeScript))
 Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encodedRemoveScript)
 ";
